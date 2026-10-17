@@ -1,0 +1,24 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.user
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Asset Store'dan gelen yerel (lisanslı) varlıklar
+/[Aa]ssets/ThirdPartyLocal/
+/[Aa]ssets/ThirdPartyLocal.meta
