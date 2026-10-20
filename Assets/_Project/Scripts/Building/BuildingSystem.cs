@@ -3,12 +3,12 @@ using UnityEngine;
 public class BuildingSystem : MonoBehaviour
 {
     [Header("İnşa Ayarları")]
-    public GameObject piecePrefab;       // Yerleştirilecek tahta prefabı
-    public float maxBuildDistance = 100f; // Farenin ulaşabileceği maksimum mesafe (Kamera yüksekse artırılmalı)
-    public LayerMask groundLayer;        // Hangi katmanlara inşa edilebilir
+    public GameObject piecePrefab;       
+    public float maxBuildDistance = 100f; 
+    public LayerMask groundLayer;        
 
     private Camera mainCamera;
-    private GameObject currentPreview;   // Fareyle gezen hayalet obje
+    private GameObject currentPreview;   
     private bool isBuilding = false;
 
     void Start()
@@ -25,7 +25,7 @@ public class BuildingSystem : MonoBehaviour
             
             if (!isBuilding && currentPreview != null)
             {
-                Destroy(currentPreview); // Mod kapalıysa hayaleti yok et
+                Destroy(currentPreview); 
             }
         }
 
@@ -37,12 +37,12 @@ public class BuildingSystem : MonoBehaviour
 
     void HandleBuilding()
     {
-        // Eğer hayalet objemiz yoksa oluştur
+        // 1. Hayalet Objeyi Oluşturma
         if (currentPreview == null)
         {
             currentPreview = Instantiate(piecePrefab);
             
-            // Fiziğini kapat ki havada asılı kalsın (düşmesin)
+            // Fiziğini kapat (havada asılı kalsın, düşmesin)
             Rigidbody rb = currentPreview.GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = true; 
             
@@ -54,19 +54,17 @@ public class BuildingSystem : MonoBehaviour
             }
         }
 
-        // Fareden 3D dünyaya bir ışın (Raycast) gönder
+        // 2. Fareyi Takip Etme (Işın / Raycast)
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        Debug.DrawRay(ray.origin, ray.direction * 100, Color.red);
         RaycastHit hit;
 
-        // Eğer ışın zemine (groundLayer) çarparsa
-        if (Physics.Raycast(ray, out hit, 1000f) && hit.collider.gameObject.tag != "BuildPiece") 
+        // Sadece zemin katmanına veya objelere çarparsa
+        if (Physics.Raycast(ray, out hit, maxBuildDistance, groundLayer))
         {
-            // Hayaleti ışının çarptığı noktaya taşı (Y ekseninde 0.5 yukarı koy ki zemine gömülmesin)
             Vector3 placePosition = new Vector3(hit.point.x, hit.point.y + 0.5f, hit.point.z);
             currentPreview.transform.position = placePosition;
 
-            // Sol tık ile yerleştir
+            // 3. Sol Tık ile Yerleştirme
             if (Input.GetMouseButtonDown(0))
             {
                 PlacePiece(placePosition);
@@ -76,18 +74,20 @@ public class BuildingSystem : MonoBehaviour
 
     void PlacePiece(Vector3 position)
     {
-        // Gerçek parçayı oluştur
+        // A. Gerçek parçayı oluştur
         GameObject placedObj = Instantiate(piecePrefab, position, Quaternion.identity);
-        
-        // Objenin adını değiştir ki Hierarchy'de görebilelim
         placedObj.name = "Placed_Wood_Piece";
         
-        // Hayaletin rengini sıfırla (Gerçek obje kahverengi olsun)
+        // B. Gerçek objenin rengini normale döndür
         Renderer rend = placedObj.GetComponent<Renderer>();
         if (rend != null)
         {
             rend.material.color = Color.white; 
         }
+
+        // C. ÇOK ÖNEMLİ: Hayalet objeyi yok et (Böylece yerleşen tahta görünür)
+        Destroy(currentPreview); 
+        currentPreview = null; // Yeni bir tahta koymak için sıfırla
 
         Debug.Log("Tahta başarıyla yerleştirildi!");
     }
