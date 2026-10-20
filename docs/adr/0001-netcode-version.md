@@ -5,7 +5,7 @@
 
 ## Context
 
-The game is a co-op survival game built with Unity 6.3 LTS (6000.3.26f1). We need a networking library for a client-server (host) topology, and the architecture must allow a later move to PvP and a dedicated server.
+The game is a co-op survival game built with Unity 6.3 LTS (6000.3.26f1). We need a networking library for a client-server (host) topology with Unity Relay.
 
 Netcode for GameObjects (NGO) is Unity's official networking library for GameObject-based projects. Two major versions were available when we made this decision:
 
