@@ -18,7 +18,7 @@ Bu projede kullanılan üçüncü taraf varlıkların (asset) listesi aşağıda
 
 | \*(Örnek: Low Poly Nature)\* | \*(Örnek: Kenney)\* | CC0 | \*(Link)\* |
 
-| | | | |
+| Survival Pack | Quaternius | CC0 | https://quaternius.com |
 
 
 
@@ -34,5 +34,5 @@ Bu projede kullanılan üçüncü taraf varlıkların (asset) listesi aşağıda
 
 | \*(Örnek: Mixamo Character)\* | \*(Örnek: Adobe)\* | Ücretsiz Kullanım (Asset Store EULA) |
 
-| | | |
+| First Person + Third Person (Starter Assets) | Unity Technologies | Asset Store EULA – repoya dahil değil, Package Manager → My Assets'ten import edip Assets/ThirdPartyLocal'a taşıyın |
 
