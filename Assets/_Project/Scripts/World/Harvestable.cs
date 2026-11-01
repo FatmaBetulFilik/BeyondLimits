@@ -1,9 +1,12 @@
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 // Ağaç, taş, çalı gibi "vurdukça kaynak veren" objeler.
 // Required Tool doluysa (örn. "Balta") o eşya envanterde yoksa kesilemez.
-public class Harvestable : MonoBehaviour, IInteractable
+// AĞ: Kalan vuruş sayısı NetworkVariable'dır; biri kesince herkeste aynı anda azalır / yok olur.
+// Sahnedeki nesnede NetworkObject bileşeni olmalı.
+public class Harvestable : NetworkBehaviour, IInteractable
 {
     [SerializeField] string actionName = "Kes";
     [SerializeField] string resourceName = "Odun";
@@ -13,24 +16,36 @@ public class Harvestable : MonoBehaviour, IInteractable
     [Tooltip("0 = tükenince yok olur. 0'dan büyükse bu kadar saniye sonra geri gelir.")]
     [SerializeField] float respawnTime = 0f;
 
-    int hitsLeft;
+    readonly NetworkVariable<int> hitsLeft = new NetworkVariable<int>(0);
     Vector3 originalPos;
 
     public string Prompt => string.IsNullOrEmpty(requiredTool)
-        ? $"{actionName} ({hitsLeft})"
-        : $"{actionName} ({hitsLeft}) - {requiredTool} gerekli";
+        ? $"{actionName} ({hitsLeft.Value})"
+        : $"{actionName} ({hitsLeft.Value}) - {requiredTool} gerekli";
 
-    public bool CanInteract => hitsLeft > 0;
+    public bool CanInteract => IsSpawned && hitsLeft.Value > 0;
 
     void Awake()
     {
-        hitsLeft = hitsToBreak;
         originalPos = transform.localPosition;
     }
 
+    public override void OnNetworkSpawn()
+    {
+        if (IsServer) hitsLeft.Value = hitsToBreak;
+        hitsLeft.OnValueChanged += OnHitsChanged;
+        InteractableUtil.SetVisible(gameObject, hitsLeft.Value > 0);   // sonradan katılan oyuncu için
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        hitsLeft.OnValueChanged -= OnHitsChanged;
+    }
+
+    // Sadece server çağırır (PlayerInteractor)
     public void Interact(GameObject interactor)
     {
-        if (!CanInteract) return;
+        if (!IsServer || !CanInteract) return;
 
         Inventory inv = interactor.GetComponent<Inventory>();
 
@@ -40,16 +55,38 @@ public class Harvestable : MonoBehaviour, IInteractable
             return;
         }
 
-        hitsLeft--;
+        hitsLeft.Value--;
         if (inv != null) inv.Add(resourceName, amountPerHit);
 
-        StartCoroutine(Shake());
+        ShakeRpc();
 
-        if (hitsLeft <= 0)
-        {
-            if (respawnTime > 0) StartCoroutine(Respawn());
-            else Destroy(gameObject, 0.25f);
-        }
+        if (hitsLeft.Value <= 0 && respawnTime > 0)
+            StartCoroutine(RespawnOnServer());
+    }
+
+    // Her bilgisayarda değer değişince: tükendiyse kısa süre sonra gizle, geri geldiyse göster
+    void OnHitsChanged(int previous, int current)
+    {
+        if (current > 0) InteractableUtil.SetVisible(gameObject, true);
+        else StartCoroutine(HideAfterDelay());
+    }
+
+    IEnumerator HideAfterDelay()
+    {
+        yield return new WaitForSeconds(0.25f);
+        if (hitsLeft.Value <= 0) InteractableUtil.SetVisible(gameObject, false);
+    }
+
+    IEnumerator RespawnOnServer()
+    {
+        yield return new WaitForSeconds(respawnTime);
+        hitsLeft.Value = hitsToBreak;
+    }
+
+    [Rpc(SendTo.Everyone)]
+    void ShakeRpc()
+    {
+        StartCoroutine(Shake());
     }
 
     IEnumerator Shake()
@@ -60,20 +97,5 @@ public class Harvestable : MonoBehaviour, IInteractable
             yield return null;
         }
         transform.localPosition = originalPos;
-    }
-
-    IEnumerator Respawn()
-    {
-        yield return new WaitForSeconds(0.25f);
-        SetVisible(false);
-        yield return new WaitForSeconds(respawnTime);
-        hitsLeft = hitsToBreak;
-        SetVisible(true);
-    }
-
-    void SetVisible(bool visible)
-    {
-        foreach (Renderer r in GetComponentsInChildren<Renderer>()) r.enabled = visible;
-        foreach (Collider c in GetComponentsInChildren<Collider>()) c.enabled = visible;
     }
 }

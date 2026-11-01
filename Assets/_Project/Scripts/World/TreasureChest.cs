@@ -1,40 +1,64 @@
 using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 
 // Hazine sandığı. Bir kez açılır, ganimeti envantere ekler.
 // Modelin kapağı ayrı bir parçaysa onu "Lid" alanına sürükle; açılırken döner.
-public class TreasureChest : MonoBehaviour, IInteractable
+// AĞ: opened NetworkVariable'dır; biri açınca herkeste kapak açılır, sonradan katılan açık görür.
+public class TreasureChest : NetworkBehaviour, IInteractable
 {
     [SerializeField] Transform lid;
     [SerializeField] Vector3 openRotation = new Vector3(-110f, 0f, 0f);
     [SerializeField] string lootName = "Altın";
     [SerializeField] int lootAmount = 10;
 
-    bool opened;
+    readonly NetworkVariable<bool> opened = new NetworkVariable<bool>(false);
+    Quaternion lidClosed;
+    Quaternion lidOpen;
 
     public string Prompt => "Sandığı aç";
-    public bool CanInteract => !opened;
+    public bool CanInteract => IsSpawned && !opened.Value;
 
+    void Awake()
+    {
+        if (lid == null) return;
+        lidClosed = lid.localRotation;
+        lidOpen = lidClosed * Quaternion.Euler(openRotation);
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        opened.OnValueChanged += OnOpenedChanged;
+        if (opened.Value && lid != null) lid.localRotation = lidOpen;   // sonradan katılan için
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        opened.OnValueChanged -= OnOpenedChanged;
+    }
+
+    void OnOpenedChanged(bool previous, bool current)
+    {
+        if (current && lid != null) StartCoroutine(OpenLid());
+    }
+
+    // Sadece server çağırır
     public void Interact(GameObject interactor)
     {
-        if (opened) return;
-        opened = true;
+        if (!IsServer || opened.Value) return;
+        opened.Value = true;
 
         Inventory inv = interactor.GetComponent<Inventory>();
         if (inv != null) inv.Add(lootName, lootAmount);
-
-        if (lid != null) StartCoroutine(OpenLid());
     }
 
     IEnumerator OpenLid()
     {
-        Quaternion start = lid.localRotation;
-        Quaternion end = start * Quaternion.Euler(openRotation);
         for (float t = 0; t < 1f; t += Time.deltaTime * 2f)
         {
-            lid.localRotation = Quaternion.Slerp(start, end, t);
+            lid.localRotation = Quaternion.Slerp(lidClosed, lidOpen, t);
             yield return null;
         }
-        lid.localRotation = end;
+        lid.localRotation = lidOpen;
     }
 }

@@ -1,26 +1,32 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// PlayerArmature objesine ekle (PlayerInteractor ve Inventory ile ayni objeye).
-// B: insa modunu ac/kapat | Sol tik: yerlestir | R: 90 derece cevir
-// Not: Bu surum tek oyunculu demo icindir. Ag (multiplayer) surumunde Place()
-// istegi server'a gonderilip blok orada Spawn edilecek.
-public class BuildingSystem : MonoBehaviour
+// Oyuncu prefab'ına ekle (PlayerInteractor ve Inventory ile aynı objeye).
+// B: inşa modunu aç/kapat | Sol tık: yerleştir | R: 90 derece çevir
+//
+// AĞ: Hayalet (preview) sadece sahibinin ekranında görünür. Yerleştirirken sahibi isteği server'a gönderir,
+// server mesafeyi ve maliyeti doğrular, bloğu oluşturup Spawn() eder; böylece herkes bloğu görür.
+// Gereken: Piece Prefab'ın kökünde NetworkObject + BuildPiece olmalı ve DefaultNetworkPrefabs listesinde olmalı.
+public class BuildingSystem : NetworkBehaviour
 {
-    [Header("Insa Ayarlari")]
+    [Header("Inşa Ayarları")]
     public GameObject piecePrefab;
-    public float maxBuildDistance = 30f;   // Kamera karakterin arkasinda, bu yuzden genis tutuldu
-    public LayerMask groundLayer = ~0;     // Varsayilan: tum katmanlar
+    public float maxBuildDistance = 30f;   // Kamera karakterin arkasında, bu yüzden geniş tutuldu
+    public LayerMask groundLayer = ~0;     // Varsayılan: tüm katmanlar
     public float rotateStep = 90f;
 
     [Header("Maliyet (Inventory varsa)")]
     public string costItem = "Odun";
     public int cost = 1;                   // 0 yaparsan bedava
 
+    [Header("Server doğrulaması")]
+    public float serverMaxPlaceDistance = 40f;   // Oyuncudan en fazla bu kadar uzağa blok konabilir
+
     Camera cam;
     Inventory inventory;
     GameObject preview;
-    float bottomOffset;                    // Pivot'tan blogun tabanina uzaklik
+    float bottomOffset;                    // Pivot'tan bloğun tabanına uzaklık
     bool isBuilding;
     bool hasValidSpot;
     Vector3 spot;
@@ -33,6 +39,7 @@ public class BuildingSystem : MonoBehaviour
 
     void Update()
     {
+        if (!IsSpawned || !IsOwner) return;
         if (Keyboard.current == null) return;
 
         if (Keyboard.current.bKey.wasPressedThisFrame)
@@ -47,7 +54,7 @@ public class BuildingSystem : MonoBehaviour
         UpdatePreview();
 
         if (hasValidSpot && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-            Place();
+            TryPlace();
     }
 
     void OnDisable()
@@ -74,7 +81,7 @@ public class BuildingSystem : MonoBehaviour
     {
         if (piecePrefab == null)
         {
-            Debug.LogError("BuildingSystem: Piece Prefab atanmamis.");
+            Debug.LogError("BuildingSystem: Piece Prefab atanmamış.");
             isBuilding = false;
             return;
         }
@@ -82,11 +89,15 @@ public class BuildingSystem : MonoBehaviour
         preview = Instantiate(piecePrefab);
         preview.name = "BuildPreview";
 
-        // Hayalet isinlari engellemesin, fizige girmesin
+        // Hayalet ağ nesnesi olmasın: sadece görüntü
+        foreach (NetworkBehaviour nb in preview.GetComponentsInChildren<NetworkBehaviour>()) Destroy(nb);
+        foreach (NetworkObject no in preview.GetComponentsInChildren<NetworkObject>()) Destroy(no);
+
+        // Işınları engellemesin, fiziğe girmesin
         foreach (Collider c in preview.GetComponentsInChildren<Collider>()) Destroy(c);
         foreach (Rigidbody rb in preview.GetComponentsInChildren<Rigidbody>()) Destroy(rb);
 
-        // Yesil renk (URP Lit icin material.color _BaseColor'a gider)
+        // Yeşil renk (URP Lit için material.color _BaseColor'a gider)
         foreach (Renderer r in preview.GetComponentsInChildren<Renderer>())
             r.material.color = new Color(0f, 1f, 0f, 0.5f);
 
@@ -101,7 +112,7 @@ public class BuildingSystem : MonoBehaviour
         if (cam == null) cam = Camera.main;
         if (cam == null) return;
 
-        // Ekranin ortasindan isin at (imlec kilitli oldugu icin fare konumu kullanilmaz)
+        // Ekranın ortasından ışın at (imleç kilitli olduğu için fare konumu kullanılmaz)
         Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         RaycastHit[] hits = Physics.RaycastAll(ray, maxBuildDistance, groundLayer, QueryTriggerInteraction.Ignore);
 
@@ -131,19 +142,40 @@ public class BuildingSystem : MonoBehaviour
             Quaternion.Euler(0f, yaw, 0f));
     }
 
-    void Place()
+    // Sahibin tarafı: sadece hızlı bir ön kontrol, asıl karar server'da
+    void TryPlace()
     {
-        if (inventory != null && cost > 0 && !inventory.Remove(costItem, cost))
+        if (inventory != null && cost > 0 && inventory.Count(costItem) < cost)
         {
             inventory.Message($"{cost} {costItem} gerekli");
             return;
         }
 
-        GameObject placed = Instantiate(
-            piecePrefab,
-            spot + Vector3.up * bottomOffset,
-            Quaternion.Euler(0f, yaw, 0f));
+        PlaceRpc(spot + Vector3.up * bottomOffset, yaw);
+    }
+
+    // Sahibinden server'a: "şuraya blok koymak istiyorum"
+    [Rpc(SendTo.Server, RequireOwnership = true)]
+    void PlaceRpc(Vector3 position, float yawDegrees)
+    {
+        if (piecePrefab == null) return;
+        if (Vector3.Distance(position, transform.position) > serverMaxPlaceDistance) return;   // doğrula: yakın mı?
+
+        if (!piecePrefab.TryGetComponent(out NetworkObject _))
+        {
+            Debug.LogError("BuildingSystem: Piece Prefab'ın kökünde NetworkObject yok.");
+            return;
+        }
+
+        if (inventory != null && cost > 0 && !inventory.Remove(costItem, cost))                // doğrula: odun var mı?
+        {
+            inventory.Message($"{cost} {costItem} gerekli");
+            return;
+        }
+
+        GameObject placed = Instantiate(piecePrefab, position, Quaternion.Euler(0f, yawDegrees, 0f));   // uygula
         placed.name = "Placed_" + piecePrefab.name;
+        placed.GetComponent<NetworkObject>().Spawn();                                                    // herkes görsün
     }
 
     static Bounds GetBounds(GameObject go)
@@ -158,12 +190,12 @@ public class BuildingSystem : MonoBehaviour
 
     void OnGUI()
     {
-        if (!isBuilding) return;
+        if (!IsSpawned || !IsOwner || !isBuilding) return;
 
-        // Nisangah
+        // Nişangah
         GUI.Box(new Rect(Screen.width / 2f - 3, Screen.height / 2f - 3, 6, 6), GUIContent.none);
 
         GUI.Box(new Rect(Screen.width / 2f - 230, Screen.height - 70, 460, 36),
-            $"INSA MODU  |  Sol tik: koy ({cost} {costItem})  |  R: cevir  |  B: cik");
+            $"İNŞA MODU  |  Sol tık: koy ({cost} {costItem})  |  R: çevir  |  B: çık");
     }
 }

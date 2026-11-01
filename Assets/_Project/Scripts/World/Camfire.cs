@@ -1,7 +1,10 @@
+using Unity.Netcode;
 using UnityEngine;
 
-// Bonfire modeline ekle. Odunla yakılır, alev ve ışık açılır, yakındaki oyuncunun canını doldurur.
-public class Campfire : MonoBehaviour, IInteractable
+// Bonfire modeline ekle. Odunla yakılır, alev ve ışık açılır, yakındaki oyuncuların canını doldurur.
+// AĞ: lit NetworkVariable'dır (herkeste yanık/sönük görünür). Yanma süresi ve iyileştirme SERVER'da hesaplanır.
+// Nesnede NetworkObject bileşeni olmalı.
+public class Campfire : NetworkBehaviour, IInteractable
 {
     [SerializeField] int woodCost = 3;
     [SerializeField] float burnTime = 60f;
@@ -11,22 +14,33 @@ public class Campfire : MonoBehaviour, IInteractable
     [SerializeField] float healRadius = 4f;
     [SerializeField] float healPerSecond = 3f;
 
-    float burnLeft;
-    PlayerStats player;
-
-    bool Lit => burnLeft > 0;
+    readonly NetworkVariable<bool> lit = new NetworkVariable<bool>(false);
+    float burnLeft;   // sadece server'da kullanılır
 
     public string Prompt => $"Ateşi yak ({woodCost} Odun)";
-    public bool CanInteract => !Lit;
+    public bool CanInteract => IsSpawned && !lit.Value;
 
-    void Start()
+    public override void OnNetworkSpawn()
     {
-        player = FindFirstObjectByType<PlayerStats>();
-        SetFire(false);
+        lit.OnValueChanged += OnLitChanged;
+        SetFire(lit.Value);
     }
 
+    public override void OnNetworkDespawn()
+    {
+        lit.OnValueChanged -= OnLitChanged;
+    }
+
+    void OnLitChanged(bool previous, bool current)
+    {
+        SetFire(current);
+    }
+
+    // Sadece server çağırır
     public void Interact(GameObject interactor)
     {
+        if (!IsServer || lit.Value) return;
+
         Inventory inv = interactor.GetComponent<Inventory>();
         if (inv == null) return;
 
@@ -37,23 +51,29 @@ public class Campfire : MonoBehaviour, IInteractable
         }
 
         burnLeft = burnTime;
-        SetFire(true);
+        lit.Value = true;
         inv.Message("Ateş yandı!");
     }
 
     void Update()
     {
-        if (!Lit) return;
+        if (!IsSpawned || !lit.Value) return;
 
-        burnLeft -= Time.deltaTime;
-
+        // Titreyen ışık: her bilgisayarda kendi görüntüsü
         if (fireLight != null)
             fireLight.intensity = lightIntensity * (0.7f + Mathf.PerlinNoise(Time.time * 6f, 0f) * 0.6f);
 
-        if (player != null && Vector3.Distance(player.transform.position, transform.position) < healRadius)
-            player.Heal(healPerSecond * Time.deltaTime);
+        if (!IsServer) return;
 
-        if (burnLeft <= 0) SetFire(false);
+        burnLeft -= Time.deltaTime;
+
+        foreach (PlayerStats p in PlayerStats.All)
+        {
+            if (Vector3.Distance(p.transform.position, transform.position) < healRadius)
+                p.Heal(healPerSecond * Time.deltaTime);
+        }
+
+        if (burnLeft <= 0) lit.Value = false;
     }
 
     void SetFire(bool on)
