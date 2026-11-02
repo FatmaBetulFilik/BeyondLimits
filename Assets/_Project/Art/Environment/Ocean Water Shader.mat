@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Water Shader
+  m_Name: Ocean Water Shader
   m_Shader: {fileID: -6465566751694194690, guid: 693efe36f91d0be4398ded764f430036, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -87,17 +87,17 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Amplitude_Wave: 1
+    - _Amplitude_Wave: 0.35
     - _BumpScale: 1
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _Fall_Off: 1
-    - _Frequency_Wave: 1
+    - _Fall_Off: 0.91
+    - _Frequency_Wave: 0.83
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _Max_Depth: 1
+    - _Max_Depth: 5
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
@@ -109,14 +109,14 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _Speed_Noise: 1
-    - _Speed_Wave: 1
+    - _Speed_Wave: 0.8
     - _SrcBlend: 1
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _Deep_Water_Color: {r: 0, g: 0, b: 0, a: 0}
+    - _Deep_Water_Color: {r: 0.30277675, g: 0.53006184, b: 0.6603774, a: 0}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _Shallow_Water_Color: {r: 0, g: 1, b: 0.8552747, a: 0}
+    - _Shallow_Water_Color: {r: 0.28490567, g: 1, b: 0.89624125, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
