@@ -20,6 +20,10 @@
 .DS_Store
 Thumbs.db
 
-# Asset Store'dan gelen yerel (lisanslı) varlıklar
-/[Aa]ssets/ThirdPartyLocal/
-/[Aa]ssets/ThirdPartyLocal.meta
+# Third-party assets are never committed. Each member downloads them locally.
+# See THIRD_PARTY_ASSETS.md for the list.
+/[Aa]ssets/ThirdParty/
+/[Aa]ssets/ThirdParty.meta
+
+# Office temporary lock files
+~$*
