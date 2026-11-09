@@ -18,3 +18,17 @@ Each team member downloads them locally into `Assets/ThirdParty/` (ignored by Gi
 ## Assets
 | Asset | Source | Version | License | Download | Folder |
 |---|---|---|---|---|---|
+
+
+Varlik Adi | Yayinci | Lisans Turu / Kisitlamalar
+Starter Assets - ThirdPerson | | Asset Store
+Ultimate Material Library | | Asset Store
+Water URP | | Asset Store
+Quaternius Survival Pack | | Asset Store
+Terrain Demo Scene URP | | Asset Store
+Yughues Free Sand Materials | | Asset Store
+Survival Pack (Axe, WaterBottle, FirstAidKit, Bonfire vb.) | | Asset Store
+First Person + Third Person Character Controllers (Starter Assets) |
+
+
+Ultimate Animated Character Pack, Sadece BlueSoldier_Male ve Casual2_Female | CC0 | https://quaternius.com
